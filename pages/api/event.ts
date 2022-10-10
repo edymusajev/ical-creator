@@ -7,9 +7,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     {
       method: "POST",
       headers: {
-        effcc3dd055176c44594cf3f231f23c9: "effcc3dd055176c44594cf3f231f23c9",
+        [process.env.APY_CRED as string]: process.env.APY_CRED as string,
         "Content-Type": "application/json",
-        "apy-token": "mAfEovIdFzW5v5Y7iSldMSKG7srH1ieiscwCEF5j59ImxT7nIg95mN",
+        "apy-token": process.env.APY_TOKEN as string,
       },
       body: JSON.stringify(req.body),
     }
