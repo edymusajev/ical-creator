@@ -1,4 +1,6 @@
 import {
+  AppShell,
+  Box,
   Button,
   Card,
   Checkbox,
@@ -15,6 +17,7 @@ import {
 } from "@mantine/core";
 import { DatePicker, TimeInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
+import { showNotification } from "@mantine/notifications";
 import {
   IconAt,
   IconCalendar,
@@ -22,6 +25,7 @@ import {
   IconMapPin,
   IconRepeat,
 } from "@tabler/icons";
+import { useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import type { NextPage } from "next";
 
@@ -39,7 +43,64 @@ interface FormValues {
   recurrence_count: number;
 }
 
+const postEvent = async (values: FormValues) => {
+  const response = await fetch("/api/event", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      summary: values.summary,
+      description: values.description,
+      organizer_email: values.organizer_email,
+      attendees_emails: values.attendees_emails,
+      location: values.location,
+      start_time: values.all_day
+        ? "00:00"
+        : dayjs(values.start_time).format("HH:mm"),
+      end_time: values.all_day
+        ? "00:00"
+        : dayjs(values.end_time).format("HH:mm"),
+      meeting_date: dayjs(values.meeting_date).format("DD-MM-YYYY"),
+      recurring: values.recurrence !== "None",
+      recurrence:
+        values.recurrence !== "None"
+          ? {
+              frequency: values.recurrence.toUpperCase(),
+              count: values.recurrence_count,
+            }
+          : {},
+    }),
+  });
+  if (response.ok) {
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "event.ics";
+    a.click();
+  } else {
+    throw new Error(`${response.status}: ${response.statusText}`);
+  }
+};
+
 const Home: NextPage = () => {
+  const { mutate, isLoading } = useMutation(postEvent, {
+    onSuccess: () => {
+      showNotification({
+        title: "Success",
+        color: "green",
+        message: "Event created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      showNotification({
+        title: "Error",
+        color: "red",
+        message: error.message,
+      });
+    },
+  });
   const form = useForm<FormValues>({
     initialValues: {
       summary: "",
@@ -61,136 +122,125 @@ const Home: NextPage = () => {
           return "Meeting date is required";
         }
       },
+      // organizer_email can be empty or a valid email
       organizer_email: (value) =>
-        /^\S+@\S+$/.test(value) ? null : "Invalid email",
+        value && !value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+          ? "Invalid email"
+          : null,
     },
   });
-  const handleClick = async () => {
-    const response = await fetch("/api/event", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        summary: form.values.summary,
-        description: form.values.description,
-        organizer_email: form.values.organizer_email,
-        attendees_emails: form.values.attendees_emails,
-        location: form.values.location,
-        start_time: form.values.all_day
-          ? "00:00"
-          : dayjs(form.values.start_time).format("HH:mm"),
-        end_time: form.values.all_day
-          ? "00:00"
-          : dayjs(form.values.end_time).format("HH:mm"),
-        meeting_date: dayjs(form.values.meeting_date).format("DD-MM-YYYY"),
-        recurring: form.values.recurrence !== "None",
-        recurrence: form.values.recurrence !== "None" && {
-          frequency: form.values.recurrence.toUpperCase(),
-          count: form.values.recurrence_count,
-        },
-      }),
-    });
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "event.ics";
-    a.click();
-  };
 
   return (
-    <Container size="sm">
-      <Card withBorder m="xl" p="xl">
-        <Title my="xl">Create iCal Event</Title>
-        <form onSubmit={form.onSubmit(handleClick)}>
-          <Stack spacing="xl">
-            <TextInput
-              withAsterisk
-              label="Summary"
-              placeholder="Summary"
-              {...form.getInputProps("summary")}
-            />
-            <Textarea
-              label="Description"
-              placeholder="Description"
-              {...form.getInputProps("description")}
-            />
-            <TextInput
-              label="Organizer Email"
-              placeholder="Organizer email"
-              icon={<IconAt size={14} />}
-              {...form.getInputProps("organizer_email")}
-            />
-            <MultiSelect
-              icon={<IconAt size={14} />}
-              data={form.values.attendees_emails}
-              getCreateLabel={(query) => `+ Add ${query}`}
-              onCreate={(query) => {
-                if (/^\S+@\S+$/.test(query)) {
-                  form.setValues({
-                    attendees_emails: [...form.values.attendees_emails, query],
-                  });
-                  return query;
-                } else {
-                  form.setFieldError("attendees_emails", "Invalid email");
-                }
-              }}
-              error={form.errors.attendees_emails}
-              label="Attendees Emails"
-              creatable
-              searchable
-            />
-            <TextInput
-              icon={<IconMapPin size={14} />}
-              label="Location"
-              {...form.getInputProps("location")}
-            />
-            <DatePicker
-              withAsterisk
-              icon={<IconCalendar size={14} />}
-              label="Date"
-              {...form.getInputProps("meeting_date")}
-            />
-            <Checkbox label="All Day" {...form.getInputProps("all_day")} />
-            <Group>
-              <TimeInput
-                icon={<IconClock size={14} />}
-                label="Start Time"
-                {...form.getInputProps("start_time")}
-                disabled={form.values.all_day}
+    <AppShell
+      sx={{
+        backgroundImage: "linear-gradient(270deg, #96F2D7 10%, #99E9F2 90%)",
+      }}
+    >
+      <Container size="sm">
+        <Card withBorder m="xl" p="xl" shadow="xl">
+          <Title my="xl">Create iCal Event</Title>
+          <form onSubmit={form.onSubmit((values) => mutate(values))}>
+            <Stack spacing="xl">
+              <TextInput
+                disabled={isLoading}
+                withAsterisk
+                label="Summary"
+                placeholder="Summary"
+                {...form.getInputProps("summary")}
               />
-              <TimeInput
-                icon={<IconClock size={14} />}
-                label="End Time"
-                {...form.getInputProps("end_time")}
-                disabled={form.values.all_day}
+              <Textarea
+                disabled={isLoading}
+                label="Description"
+                placeholder="Description"
+                {...form.getInputProps("description")}
               />
-            </Group>
-            <Group>
-              <Select
-                icon={<IconRepeat size={14} />}
-                {...form.getInputProps("recurrence")}
-                label="Repeat"
-                data={["None", "Daily", "Weekly", "Monthly", "Yearly"]}
+              <TextInput
+                disabled={isLoading}
+                label="Organizer Email"
+                placeholder="Organizer email"
+                icon={<IconAt size={14} />}
+                {...form.getInputProps("organizer_email")}
               />
-              <NumberInput
-                {...form.getInputProps("recurrence_count")}
-                min={0}
-                label="Times"
-                disabled={form.values.recurrence === "None"}
+              <MultiSelect
+                disabled={isLoading}
+                icon={<IconAt size={14} />}
+                data={form.values.attendees_emails}
+                getCreateLabel={(query) => `+ Add ${query}`}
+                onCreate={(query) => {
+                  if (/^\S+@\S+$/.test(query)) {
+                    form.setValues({
+                      attendees_emails: [
+                        ...form.values.attendees_emails,
+                        query,
+                      ],
+                    });
+                    return query;
+                  } else {
+                    form.setFieldError("attendees_emails", "Invalid email");
+                  }
+                }}
+                error={form.errors.attendees_emails}
+                label="Attendees Emails"
+                creatable
+                searchable
               />
-            </Group>
-            <Group position="right">
-              <Button type="submit" onClick={handleClick}>
-                Create Event
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Card>
-    </Container>
+              <TextInput
+                disabled={isLoading}
+                icon={<IconMapPin size={14} />}
+                label="Location"
+                {...form.getInputProps("location")}
+              />
+              <DatePicker
+                disabled={isLoading}
+                withAsterisk
+                icon={<IconCalendar size={14} />}
+                label="Date"
+                {...form.getInputProps("meeting_date")}
+              />
+              <Checkbox
+                disabled={isLoading}
+                label="All Day"
+                {...form.getInputProps("all_day")}
+              />
+              <Group>
+                <TimeInput
+                  icon={<IconClock size={14} />}
+                  label="Start Time"
+                  {...form.getInputProps("start_time")}
+                  disabled={form.values.all_day || isLoading}
+                />
+                <TimeInput
+                  icon={<IconClock size={14} />}
+                  label="End Time"
+                  {...form.getInputProps("end_time")}
+                  disabled={form.values.all_day || isLoading}
+                />
+              </Group>
+              <Group>
+                <Select
+                  icon={<IconRepeat size={14} />}
+                  {...form.getInputProps("recurrence")}
+                  label="Repeat"
+                  data={["None", "Daily", "Weekly", "Monthly", "Yearly"]}
+                  disabled={isLoading}
+                />
+                <NumberInput
+                  {...form.getInputProps("recurrence_count")}
+                  min={0}
+                  label="Times"
+                  disabled={form.values.recurrence === "None" || isLoading}
+                />
+              </Group>
+              <Group position="right">
+                <Button type="submit" loading={isLoading}>
+                  Create Event
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        </Card>
+      </Container>
+    </AppShell>
   );
 };
 

@@ -14,6 +14,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       body: JSON.stringify(req.body),
     }
   );
+  if (!response.ok) {
+    res.status(response.status).json({ error: response.statusText });
+    return;
+  }
   res.setHeader("Content-Type", "text/calendar");
   res.setHeader("Content-Disposition", "attachment; filename=invite.ics");
   pipeline(response.body as any, res, (err) => {
