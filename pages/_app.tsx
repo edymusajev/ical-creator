@@ -24,6 +24,7 @@ function MyApp({
           withNormalizeCSS
           theme={{
             colorScheme: "light",
+            primaryColor: "teal",
           }}
         >
           <NotificationsProvider>
