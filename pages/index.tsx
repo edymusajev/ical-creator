@@ -131,11 +131,7 @@ const Home: NextPage = () => {
   });
 
   return (
-    <AppShell
-      sx={{
-        backgroundImage: "linear-gradient(270deg, #96F2D7 10%, #99E9F2 90%)",
-      }}
-    >
+    <AppShell>
       <Container size="sm">
         <Card withBorder m="xl" p="xl" shadow="xl">
           <Title my="xl">Create iCal Event</Title>
