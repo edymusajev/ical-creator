@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { pipeline, PipelineSource } from "stream";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
+  console.log(req.body);
   const response = await fetch(
     "https://api.apyhub.com/generate/ical/file?output=invite.ics",
     {

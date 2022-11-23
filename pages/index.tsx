@@ -35,11 +35,12 @@ interface FormValues {
   organizer_email: string;
   attendees_emails: string[];
   location: string;
+  timezone: string;
   meeting_date: Date;
   start_time: Date;
   end_time: Date;
   all_day: boolean;
-  recurrence: "None" | "Daily" | "Weekly" | "Monthly" | "Yearly";
+  recurrence_frequency: "None" | "Daily" | "Weekly" | "Monthly" | "Yearly";
   recurrence_count: number;
 }
 
@@ -55,6 +56,7 @@ const postEvent = async (values: FormValues) => {
       organizer_email: values.organizer_email,
       attendees_emails: values.attendees_emails,
       location: values.location,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       start_time: values.all_day
         ? "00:00"
         : dayjs(values.start_time).format("HH:mm"),
@@ -62,14 +64,17 @@ const postEvent = async (values: FormValues) => {
         ? "00:00"
         : dayjs(values.end_time).format("HH:mm"),
       meeting_date: dayjs(values.meeting_date).format("DD-MM-YYYY"),
-      recurring: values.recurrence !== "None",
-      recurrence:
-        values.recurrence !== "None"
-          ? {
-              frequency: values.recurrence.toUpperCase(),
-              count: values.recurrence_count,
-            }
-          : {},
+      recurring: values.recurrence_frequency !== "None",
+      recurrence: {
+        frequency:
+          values.recurrence_frequency !== "None"
+            ? values.recurrence_frequency.toUpperCase()
+            : null,
+        count:
+          values.recurrence_frequency !== "None"
+            ? values.recurrence_count
+            : null,
+      },
     }),
   });
   if (response.ok) {
@@ -84,7 +89,38 @@ const postEvent = async (values: FormValues) => {
   }
 };
 
-const Home: NextPage = () => {
+export const getServerSideProps = async () => {
+  const response = await fetch(
+    "https://api.apyhub.com/data/dictionary/timezone",
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "apy-token": process.env.APY_TOKEN as string,
+      },
+    }
+  );
+  console.log(response);
+  const { data } = await response.json();
+  console.log(data.filter((d: any) => d.name === "America/Port_of_Spain"));
+  return {
+    props: {
+      timezones: data,
+    },
+  };
+};
+
+type Props = {
+  timezones: {
+    key: string;
+    value: string;
+    abbreviation: string[];
+    utc_time: string;
+  }[];
+};
+
+const Home: NextPage<Props> = ({ timezones }: Props) => {
+  console.log(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
   const { mutate, isLoading } = useMutation(postEvent, {
     onSuccess: () => {
       showNotification({
@@ -108,11 +144,12 @@ const Home: NextPage = () => {
       organizer_email: "",
       attendees_emails: [],
       location: "",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       meeting_date: new Date(),
       start_time: dayjs().hour(9).minute(0).toDate(),
       end_time: dayjs().hour(10).minute(0).toDate(),
       all_day: false,
-      recurrence: "None",
+      recurrence_frequency: "None",
       recurrence_count: 0,
     },
     validate: {
@@ -122,11 +159,24 @@ const Home: NextPage = () => {
           return "Meeting date is required";
         }
       },
-      // organizer_email can be empty or a valid email
-      organizer_email: (value) =>
-        value && !value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
-          ? "Invalid email"
-          : null,
+      // organizer_email must be a valid email
+      organizer_email: (value) => {
+        if (!value) {
+          return "Organizer email is required";
+        }
+        if (!value.includes("@")) {
+          return "Organizer email must be a valid email";
+        }
+      },
+      // attendees_emails must be a valid email
+      attendees_emails: (value) => {
+        if (value.length === 0) {
+          return "Attendees emails are required";
+        }
+        if (value.some((email) => !email.includes("@"))) {
+          return "Attendees emails must be a valid email";
+        }
+      },
     },
   });
 
@@ -158,6 +208,7 @@ const Home: NextPage = () => {
                 {...form.getInputProps("organizer_email")}
               />
               <MultiSelect
+                withAsterisk
                 disabled={isLoading}
                 icon={<IconAt size={14} />}
                 data={form.values.attendees_emails}
@@ -181,10 +232,21 @@ const Home: NextPage = () => {
                 searchable
               />
               <TextInput
+                withAsterisk
                 disabled={isLoading}
                 icon={<IconMapPin size={14} />}
                 label="Location"
                 {...form.getInputProps("location")}
+              />
+              <Select
+                searchable
+                nothingFound="No options"
+                maxDropdownHeight={280}
+                label="Timezone"
+                {...form.getInputProps("timezone")}
+                data={Array.from(
+                  new Set(timezones.map((timezone) => timezone.value))
+                )}
               />
               <DatePicker
                 disabled={isLoading}
@@ -215,7 +277,7 @@ const Home: NextPage = () => {
               <Group>
                 <Select
                   icon={<IconRepeat size={14} />}
-                  {...form.getInputProps("recurrence")}
+                  {...form.getInputProps("recurrence_frequency")}
                   label="Repeat"
                   data={["None", "Daily", "Weekly", "Monthly", "Yearly"]}
                   disabled={isLoading}
@@ -224,7 +286,9 @@ const Home: NextPage = () => {
                   {...form.getInputProps("recurrence_count")}
                   min={0}
                   label="Times"
-                  disabled={form.values.recurrence === "None" || isLoading}
+                  disabled={
+                    form.values.recurrence_frequency === "None" || isLoading
+                  }
                 />
               </Group>
               <Group position="right">
