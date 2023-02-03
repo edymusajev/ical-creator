@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { pipeline, PipelineSource } from "stream";
+import { pipeline } from "stream";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
-  console.log(req.body);
   const response = await fetch(
     "https://api.apyhub.com/generate/ical/file?output=invite.ics",
     {
@@ -23,7 +22,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   res.setHeader("Content-Disposition", "attachment; filename=invite.ics");
   pipeline(response.body as any, res, (err) => {
     if (err) {
-      console.error(err);
       res.status(500).end();
     }
   });

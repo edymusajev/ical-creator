@@ -26,6 +26,7 @@ import {
   IconRepeat,
 } from "@tabler/icons";
 import { useMutation } from "@tanstack/react-query";
+import { data } from "apyhub";
 import dayjs from "dayjs";
 import type { NextPage } from "next";
 
@@ -45,7 +46,7 @@ interface FormValues {
 }
 
 const postEvent = async (values: FormValues) => {
-  const response = await fetch("/api/event", {
+  const response = await fetch("/api/ical", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -77,34 +78,16 @@ const postEvent = async (values: FormValues) => {
       },
     }),
   });
-  if (response.ok) {
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "event.ics";
-    a.click();
-  } else {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
+
+  const { data } = await response.json();
+  window.open(data, "_blank");
 };
 
 export const getServerSideProps = async () => {
-  const response = await fetch(
-    "https://api.apyhub.com/data/dictionary/timezone",
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "apy-token": process.env.APY_TOKEN as string,
-      },
-    }
-  );
-  console.log(response);
-  const { data } = await response.json();
-  console.log(data.filter((d: any) => d.name === "America/Port_of_Spain"));
+  const { data: timezones } = await data.timezones();
   return {
     props: {
-      timezones: data,
+      timezones,
     },
   };
 };
@@ -119,8 +102,6 @@ type Props = {
 };
 
 const Home: NextPage<Props> = ({ timezones }: Props) => {
-  console.log(Intl.DateTimeFormat().resolvedOptions().timeZone);
-
   const { mutate, isLoading } = useMutation(postEvent, {
     onSuccess: () => {
       showNotification({
@@ -190,18 +171,23 @@ const Home: NextPage<Props> = ({ timezones }: Props) => {
               <TextInput
                 disabled={isLoading}
                 withAsterisk
+                required
                 label="Summary"
                 placeholder="Summary"
                 {...form.getInputProps("summary")}
               />
               <Textarea
                 disabled={isLoading}
+                withAsterisk
+                required
                 label="Description"
                 placeholder="Description"
                 {...form.getInputProps("description")}
               />
               <TextInput
                 disabled={isLoading}
+                withAsterisk
+                required
                 label="Organizer Email"
                 placeholder="Organizer email"
                 icon={<IconAt size={14} />}
@@ -209,6 +195,7 @@ const Home: NextPage<Props> = ({ timezones }: Props) => {
               />
               <MultiSelect
                 withAsterisk
+                required
                 disabled={isLoading}
                 icon={<IconAt size={14} />}
                 data={form.values.attendees_emails}
@@ -233,14 +220,18 @@ const Home: NextPage<Props> = ({ timezones }: Props) => {
               />
               <TextInput
                 withAsterisk
+                required
                 disabled={isLoading}
                 icon={<IconMapPin size={14} />}
                 label="Location"
                 {...form.getInputProps("location")}
               />
               <Select
+                withAsterisk
+                required
                 searchable
                 nothingFound="No options"
+                disabled={isLoading}
                 maxDropdownHeight={280}
                 label="Timezone"
                 {...form.getInputProps("timezone")}
@@ -251,6 +242,7 @@ const Home: NextPage<Props> = ({ timezones }: Props) => {
               <DatePicker
                 disabled={isLoading}
                 withAsterisk
+                required
                 icon={<IconCalendar size={14} />}
                 label="Date"
                 {...form.getInputProps("meeting_date")}
